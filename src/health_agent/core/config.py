@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     llm_base_url: str
     llm_model: str
 
+    embedding_model: str = "BAAI/bge-m3"
+
+    database_url: str
+
     llm_temperature: float = 0.2
     llm_timeout_seconds: float = 30.0
     llm_max_retries: int = 2
