@@ -31,3 +31,30 @@ class SearchResult:
 
     chunk: DocumentChunk
     score: float
+
+
+@dataclass(frozen=True)
+class Citation:
+    """表示引用信息，包括来源ID、标题、页码和分块ID。"""
+
+    source_id: int
+    title: str
+    page: int
+    chunk_id: str
+
+
+@dataclass(frozen=True)
+class RAGAnswer:
+    """表示RAG（Retrieval-Augmented Generation）模型的回答，包括答案文本、使用的模型、引用信息以及相关的令牌和延迟信息。"""
+
+    answer: str
+    model: str
+    citations: list[Citation]
+
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+    retrieval_latency_ms: float = 0.0
+    generation_latency_ms: float = 0.0
+    total_latency_ms: float = 0.0

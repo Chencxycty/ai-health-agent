@@ -4,10 +4,8 @@ from health_agent.database.repositories import (
 )
 from health_agent.database.session import SessionLocal
 from health_agent.rag.embeddings import EmbeddingModel
-from health_agent.rag.schemas import (
-    DocumentChunk,
-    SearchResult,
-)
+from health_agent.rag.mappers import model_to_chunk
+from health_agent.rag.schemas import SearchResult
 
 
 class VectorRetriever:
@@ -25,35 +23,24 @@ class VectorRetriever:
         self,
         query: str,
         top_k: int = 5,
+        document_id: str | None = None,
     ) -> list[SearchResult]:
+        """使用向量搜索查找与查询最相似的文档块。"""
         query_embedding = self.embedding_model.embed_query(query)
 
         with SessionLocal() as session:
             repository = DocumentChunkRepository(session)
 
             rows = repository.vector_search(
-                query_embedding=query_embedding.tolist(),
+                query_embedding=(query_embedding.tolist()),
                 top_k=top_k,
+                document_id=document_id,
             )
 
-        results: list[SearchResult] = []
-
-        for model, score in rows:
-            chunk = DocumentChunk(
-                chunk_id=model.chunk_id,
-                document_id=model.document_id,
-                title=model.title,
-                source=model.source,
-                page=model.page,
-                chunk_index=model.chunk_index,
-                content=model.content,
+        return [
+            SearchResult(
+                chunk=model_to_chunk(model),
+                score=score,
             )
-
-            results.append(
-                SearchResult(
-                    chunk=chunk,
-                    score=score,
-                )
-            )
-
-        return results
+            for model, score in rows
+        ]

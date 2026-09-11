@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     llm_base_url: str
     llm_model: str
 
+    # 编码模型和重排序模型
     embedding_model: str = "BAAI/bge-m3"
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
     database_url: str
 

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "q001",
+    "query": "高血压患者如何进行家庭血压监测？",
+    "answerable": true,
+    "expected_pages": [3],
+    "keywords": [
+      "家庭血压",
+      "监测"
+    ]
+  },
+  {
+    "id": "q002",
+    "query": "哪些情况需要进行转诊？",
+    "answerable": true,
+    "expected_pages": [5],
+    "keywords": [
+      "转诊"
+    ]
+  },
+  {
+    "id": "q003",
+    "query": "肺癌靶向药物有哪些？",
+    "answerable": false,
+    "expected_pages": [],
+    "keywords": []
+  }
+]
