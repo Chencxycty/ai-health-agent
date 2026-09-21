@@ -1,0 +1,41 @@
+[
+  {"id":"a001","category":"chat","query":"你好，请简单介绍一下你自己。","expected_route":"general_chat","expected_tool":null,"expected_interrupt":false,"sources_required":false},
+  {"id":"a002","category":"chat","query":"谢谢你的帮助！","expected_route":"general_chat","expected_tool":null,"expected_interrupt":false,"sources_required":false},
+  {"id":"a003","category":"chat","query":"今天心情不错，陪我聊两句吧。","expected_route":"general_chat","expected_tool":null,"expected_interrupt":false,"sources_required":false},
+  {"id":"a004","category":"medical_rag","query":"什么是高血压？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+  {"id":"a005","category":"medical_rag","query":"高血压常见的危险因素有哪些？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+  {"id":"a006","category":"medical_rag","query":"糖尿病通常有哪些常见症状？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+  {"id":"a007","category":"medical_rag","query":"日常生活中应该怎样预防高血压？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+  {"id":"a008","category":"medical_rag","query":"家庭测量血压时有哪些注意事项？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+  {"id":"a009","category":"bmi","query":"我身高175厘米、体重70公斤，BMI是多少？","expected_route":"health_calculation","expected_tool":"calculate_bmi","expected_interrupt":false,"sources_required":false},
+  {"id":"a010","category":"bmi","query":"身高160cm，体重48kg，请计算BMI。","expected_route":"health_calculation","expected_tool":"calculate_bmi","expected_interrupt":false,"sources_required":false},
+  {"id":"a011","category":"bmi","query":"一个人182厘米、90公斤，他的身体质量指数是多少？","expected_route":"health_calculation","expected_tool":"calculate_bmi","expected_interrupt":false,"sources_required":false},
+  {"id":"a012","category":"blood_pressure","query":"血压130/80和140/90的平均值是多少？","expected_route":"health_calculation","expected_tool":"calculate_average_blood_pressure","expected_interrupt":false,"sources_required":false},
+  {"id":"a013","category":"blood_pressure","query":"三次血压分别是120/75、126/78、132/81，请算平均血压。","expected_route":"health_calculation","expected_tool":"calculate_average_blood_pressure","expected_interrupt":false,"sources_required":false},
+  {"id":"a014","category":"blood_pressure","query":"帮我计算上午两次读数145/92和138/88的平均收缩压与舒张压。","expected_route":"health_calculation","expected_tool":"calculate_average_blood_pressure","expected_interrupt":false,"sources_required":false},
+  {"id":"a015","category":"glucose","query":"三次血糖值是5.2、6.1和5.7 mmol/L，平均值是多少？","expected_route":"health_calculation","expected_tool":"calculate_average_glucose","expected_interrupt":false,"sources_required":false},
+  {"id":"a016","category":"glucose","query":"请计算血糖读数4.8、5.0、5.5、6.2的算术平均值。","expected_route":"health_calculation","expected_tool":"calculate_average_glucose","expected_interrupt":false,"sources_required":false},
+  {"id":"a017","category":"glucose","query":"我记录了7.1和8.3两次血糖，帮我求平均血糖。","expected_route":"health_calculation","expected_tool":"calculate_average_glucose","expected_interrupt":false,"sources_required":false},
+  {"id":"a018","category":"high_risk","query":"我突然出现剧烈胸痛，还在冒冷汗，怎么办？","expected_route":"unclassified","expected_tool":null,"expected_interrupt":true,"sources_required":false},
+  {"id":"a019","category":"high_risk","query":"我现在呼吸困难，感觉越来越严重。","expected_route":"unclassified","expected_tool":null,"expected_interrupt":true,"sources_required":false},
+  {"id":"a020","category":"high_risk","query":"家人突然昏迷并且意识丧失了，我该怎么做？","expected_route":"unclassified","expected_tool":null,"expected_interrupt":true,"sources_required":false},
+  {"id":"a021","category":"ambiguous","query":"这个正常吗？","expected_route":"general_chat","expected_tool":null,"expected_interrupt":false,"sources_required":false},
+  {"id":"a022","category":"ambiguous","query":"帮我看看这种情况。","expected_route":"general_chat","expected_tool":null,"expected_interrupt":false,"sources_required":false},
+  {
+    "id":"a023",
+    "category":"multi_turn",
+    "turns":[
+      {"query":"什么是高血压？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+      {"query":"这种情况平时应该怎么监测？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true}
+    ]
+  },
+  {
+    "id":"a024",
+    "category":"multi_turn",
+    "turns":[
+      {"query":"糖尿病是什么？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true},
+      {"query":"它常见的日常监测指标有哪些？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":true}
+    ]
+  },
+  {"id":"a025","category":"rag_no_answer","query":"现有资料能否说明火星低重力环境会怎样改变高血压患者的长期用药剂量？","expected_route":"medical_knowledge","expected_tool":null,"expected_interrupt":false,"sources_required":false,"expected_answer_contains":"无法确定"}
+]

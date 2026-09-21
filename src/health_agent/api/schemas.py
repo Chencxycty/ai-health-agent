@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Any
 
 
 class HealthResponse(BaseModel):
@@ -65,3 +66,43 @@ class RAGQueryResponse(BaseModel):
     retrieval_latency_ms: float
     generation_latency_ms: float
     total_latency_ms: float
+
+
+class AgentQueryRequest(BaseModel):
+    """Agent查询请求模型，用于封装用户的查询请求。"""
+
+    message: str = Field(
+        min_length=1,
+        max_length=5000,
+    )
+
+    thread_id: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+
+class AgentResumeRequest(BaseModel):
+    """Agent查询请求重启"""
+
+    thread_id: str
+
+    approved: bool
+
+
+class AgentQueryResponse(BaseModel):
+    """Agent响应"""
+
+    answer: str
+
+    route: str
+
+    tool_name: str | None
+
+    sources: list[dict[str, Any]]
+
+    steps: list[str]
+
+    interrupted: bool
+
+    interrupt_payload: Any | None

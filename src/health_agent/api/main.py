@@ -22,6 +22,18 @@ from health_agent.rag.service import (
     RAGService,
 )
 
+from health_agent.agent.service import (
+    AgentService,
+)
+from health_agent.api.dependencies import (
+    get_agent_service,
+)
+from health_agent.api.schemas import (
+    AgentQueryRequest,
+    AgentQueryResponse,
+    AgentResumeRequest,
+)
+
 configure_logging()
 logger = logging.getLogger(__name__)
 
@@ -115,4 +127,54 @@ def rag_query(
         retrieval_latency_ms=(result.retrieval_latency_ms),
         generation_latency_ms=(result.generation_latency_ms),
         total_latency_ms=(result.total_latency_ms),
+    )
+
+
+#
+@app.post(
+    "/agent/query",
+    response_model=AgentQueryResponse,
+)
+def agent_query(
+    request: AgentQueryRequest,
+    agent: AgentService = Depends(get_agent_service),
+) -> AgentQueryResponse:
+    result = agent.query(
+        message=request.message,
+        thread_id=request.thread_id,
+    )
+
+    return AgentQueryResponse(
+        answer=result.answer,
+        route=result.route,
+        tool_name=result.tool_name,
+        sources=result.sources,
+        steps=result.steps,
+        interrupted=result.interrupted,
+        interrupt_payload=(result.interrupt_payload),
+    )
+
+
+#
+@app.post(
+    "/agent/resume",
+    response_model=AgentQueryResponse,
+)
+def agent_resume(
+    request: AgentResumeRequest,
+    agent: AgentService = Depends(get_agent_service),
+) -> AgentQueryResponse:
+    result = agent.resume(
+        thread_id=request.thread_id,
+        approved=request.approved,
+    )
+
+    return AgentQueryResponse(
+        answer=result.answer,
+        route=result.route,
+        tool_name=result.tool_name,
+        sources=result.sources,
+        steps=result.steps,
+        interrupted=result.interrupted,
+        interrupt_payload=(result.interrupt_payload),
     )

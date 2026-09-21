@@ -28,6 +28,7 @@ from health_agent.rag.service import (
 from health_agent.rag.vector_retriever import (
     VectorRetriever,
 )
+from functools import lru_cache
 
 
 def build_bm25_retriever() -> BM25Retriever:
@@ -65,6 +66,7 @@ def build_hybrid_retriever(
     )
 
 
+@lru_cache(maxsize=1)
 def build_rag_service() -> RAGService:
     """构建RAG（Retrieval-Augmented Generation）服务。"""
     retriever = build_hybrid_retriever(use_reranker=True)
