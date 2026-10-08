@@ -11,16 +11,23 @@ from health_agent.tools.registry import (
     TOOLS,
     execute_tool,
 )
+from health_agent.mcp.client import (
+    HealthMCPClient,
+)
 
 
 class AgentNodes:
     def __init__(
         self,
-        llm: LLMProvider,
-        rag_service: RAGService,
+        llm,
+        rag_service,
+        mcp_client: HealthMCPClient,
     ) -> None:
         self.llm = llm
+
         self.rag_service = rag_service
+
+        self.mcp_client = mcp_client
 
     def risk_node(
         self,
@@ -182,9 +189,11 @@ class AgentNodes:
         state: AgentState,
     ) -> dict[str, Any]:
         try:
+            tools = self.mcp_client.openai_tool_schemas()
+
             tool_call = self.llm.choose_tool(
                 user_prompt=(state["user_message"]),
-                tools=TOOLS,
+                tools=tools,
             )
 
             if tool_call is None:
@@ -192,32 +201,47 @@ class AgentNodes:
                     "tool_name": None,
                     "tool_arguments": {},
                     "tool_result": None,
-                    "tool_error": ("No tool selected."),
+                    "tool_error": "No MCP tool selected.",
                     "steps": [
                         *state.get(
                             "steps",
                             [],
                         ),
-                        "tool_selection_failed",
+                        ("mcp_tool_selection_failed"),
                     ],
                 }
 
-            result = execute_tool(
-                name=tool_call.name,
+            result = self.mcp_client.call_tool(
+                name=(tool_call.name),
                 arguments=(tool_call.arguments),
             )
 
+            if result.is_error:
+                return {
+                    "tool_name": tool_call.name,
+                    "tool_arguments": tool_call.arguments,
+                    "tool_result": None,
+                    "tool_error": result.error,
+                    "steps": [
+                        *state.get(
+                            "steps",
+                            [],
+                        ),
+                        (f"mcp_tool_error:{tool_call.name}"),
+                    ],
+                }
+
             return {
                 "tool_name": tool_call.name,
-                "tool_arguments": (tool_call.arguments),
-                "tool_result": result,
+                "tool_arguments": tool_call.arguments,
+                "tool_result": result.data,
                 "tool_error": None,
                 "steps": [
                     *state.get(
                         "steps",
                         [],
                     ),
-                    f"tool:{tool_call.name}",
+                    (f"mcp_tool:{tool_call.name}"),
                 ],
             }
 
@@ -229,7 +253,7 @@ class AgentNodes:
                         "steps",
                         [],
                     ),
-                    "tool_error",
+                    "mcp_tool_exception",
                 ],
             }
 

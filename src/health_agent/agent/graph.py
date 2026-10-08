@@ -65,13 +65,15 @@ def route_after_router(
 
 
 def build_agent_graph(
-    llm: LLMProvider,
-    rag_service: RAGService,
+    llm,
+    rag_service,
+    mcp_client,
     checkpointer=None,
 ):
     nodes = AgentNodes(
         llm=llm,
-        rag_service=rag_service,
+        rag_service=(rag_service),
+        mcp_client=(mcp_client),
     )
 
     builder = StateGraph(AgentState)

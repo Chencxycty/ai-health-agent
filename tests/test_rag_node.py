@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from unittest.mock import AsyncMock
 
 from health_agent.agent.nodes import (
     AgentNodes,
@@ -48,6 +49,7 @@ def test_rag_node() -> None:
     nodes = AgentNodes(
         llm=FakeLLM(),
         rag_service=FakeRAGService(),
+        mcp_client=AsyncMock(),
     )
 
     result = nodes.rag_node(
