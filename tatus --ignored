@@ -1,0 +1,393 @@
+[1mdiff --git a/scripts/init_db.py b/scripts/init_db.py[m
+[1mindex 289be52..8b5aae1 100644[m
+[1m--- a/scripts/init_db.py[m
+[1m+++ b/scripts/init_db.py[m
+[36m@@ -2,6 +2,7 @@[m [mfrom sqlalchemy import text[m
+ [m
+ from health_agent.database.base import Base[m
+ from health_agent.database.models import DocumentChunkModel  # noqa: F401[m
+[32m+[m[32mimport health_agent.healthcare.models  # noqa: F401[m
+ from health_agent.database.session import engine[m
+ [m
+ [m
+[1mdiff --git a/src/health_agent/agent/nodes.py b/src/health_agent/agent/nodes.py[m
+[1mindex c79a75e..cdbb6fb 100644[m
+[1m--- a/src/health_agent/agent/nodes.py[m
+[1m+++ b/src/health_agent/agent/nodes.py[m
+[36m@@ -14,6 +14,16 @@[m [mfrom health_agent.tools.registry import ([m
+ from health_agent.mcp.client import ([m
+     HealthMCPClient,[m
+ )[m
+[32m+[m[32mfrom health_agent.observability.tracing import ([m
+[32m+[m[32m    get_tracer,[m
+[32m+[m[32m)[m
+[32m+[m[32mfrom opentelemetry.trace import ([m
+[32m+[m[32m    Status,[m
+[32m+[m[32m    StatusCode,[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mtracer = get_tracer()[m
+ [m
+ [m
+ class AgentNodes:[m
+[36m@@ -33,20 +43,31 @@[m [mclass AgentNodes:[m
+         self,[m
+         state: AgentState,[m
+     ) -> dict[str, Any]:[m
+[31m-        assessment = assess_risk(state["user_message"])[m
+[32m+[m[32m        with tracer.start_as_current_span("agent.risk") as span:[m
+[32m+[m[32m            assessment = assess_risk(state["user_message"])[m
+ [m
+[31m-        return {[m
+[31m-            "risk_level": assessment.level,[m
+[31m-            "risk_reason": assessment.reason,[m
+[31m-            "review_required": (assessment.level == "high"),[m
+[31m-            "steps": [[m
+[31m-                *state.get([m
+[31m-                    "steps",[m
+[31m-                    [],[m
+[31m-                ),[m
+[31m-                "risk_check",[m
+[31m-            ],[m
+[31m-        }[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "agent.risk_level",[m
+[32m+[m[32m                assessment.level,[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "agent.review_required",[m
+[32m+[m[32m                assessment.level == "high",[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                "risk_level": assessment.level,[m
+[32m+[m[32m                "risk_reason": assessment.reason,[m
+[32m+[m[32m                "review_required": assessment.level == "high",[m
+[32m+[m[32m                "steps": [[m
+[32m+[m[32m                    *state.get([m
+[32m+[m[32m                        "steps",[m
+[32m+[m[32m                        [],[m
+[32m+[m[32m                    ),[m
+[32m+[m[32m                    "risk_check",[m
+[32m+[m[32m                ],[m
+[32m+[m[32m            }[m
+ [m
+     def human_review_node([m
+         self,[m
+[36m@@ -101,19 +122,33 @@[m [mclass AgentNodes:[m
+         self,[m
+         state: AgentState,[m
+     ) -> dict[str, Any]:[m
+[31m-        result = classify_intent([m
+[31m-            llm=self.llm,[m
+[31m-            query=state["user_message"],[m
+[31m-        )[m
+[32m+[m[32m        with tracer.start_as_current_span("agent.router") as span:[m
+[32m+[m[32m            result = classify_intent([m
+[32m+[m[32m                llm=self.llm,[m
+[32m+[m[32m                query=state["user_message"],[m
+[32m+[m[32m            )[m
+ [m
+[31m-        return {[m
+[31m-            "route": result.intent,[m
+[31m-            "confidence": result.confidence,[m
+[31m-            "steps": [[m
+[31m-                *state.get("steps", []),[m
+[31m-                "router",[m
+[31m-            ],[m
+[31m-        }[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "agent.route",[m
+[32m+[m[32m                result.intent,[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "agent.route_confidence",[m
+[32m+[m[32m                result.confidence,[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                "route": result.intent,[m
+[32m+[m[32m                "confidence": result.confidence,[m
+[32m+[m[32m                "steps": [[m
+[32m+[m[32m                    *state.get([m
+[32m+[m[32m                        "steps",[m
+[32m+[m[32m                        [],[m
+[32m+[m[32m                    ),[m
+[32m+[m[32m                    "router",[m
+[32m+[m[32m                ],[m
+[32m+[m[32m            }[m
+ [m
+     def chat_node([m
+         self,[m
+[36m@@ -153,110 +188,162 @@[m [mclass AgentNodes:[m
+         self,[m
+         state: AgentState,[m
+     ) -> dict[str, Any]:[m
+[31m-        query = state.get("rag_query") or state["user_message"][m
+[31m-[m
+[31m-        result = self.rag_service.answer([m
+[31m-            query=query,[m
+[31m-        )[m
+[32m+[m[32m        with tracer.start_as_current_span("agent.rag") as span:[m
+[32m+[m[32m            query = state.get("rag_query") or state["user_message"][m
+ [m
+[31m-        sources = [[m
+[31m-            {[m
+[31m-                "source_id": citation.source_id,[m
+[31m-                "title": citation.title,[m
+[31m-                "page": citation.page,[m
+[31m-                "chunk_id": citation.chunk_id,[m
+[31m-            }[m
+[31m-            for citation in result.citations[m
+[31m-        ][m
+[32m+[m[32m            result = self.rag_service.answer([m
+[32m+[m[32m                query=query,[m
+[32m+[m[32m                top_k=5,[m
+[32m+[m[32m            )[m
+ [m
+[31m-        return {[m
+[31m-            "final_answer": result.answer,[m
+[31m-            "sources": sources,[m
+[31m-            "messages": [[m
+[32m+[m[32m            sources = [[m
+                 {[m
+[31m-                    "role": "assistant",[m
+[31m-                    "content": result.answer,[m
+[32m+[m[32m                    "source_id": citation.source_id,[m
+[32m+[m[32m                    "title": citation.title,[m
+[32m+[m[32m                    "page": citation.page,[m
+[32m+[m[32m                    "chunk_id": citation.chunk_id,[m
+                 }[m
+[31m-            ],[m
+[31m-            "steps": [[m
+[31m-                *state.get("steps", []),[m
+[31m-                "rag",[m
+[31m-            ],[m
+[31m-        }[m
+[32m+[m[32m                for citation in result.citations[m
+[32m+[m[32m            ][m
+[32m+[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "rag.source_count",[m
+[32m+[m[32m                len(sources),[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "rag.retrieval_latency_ms",[m
+[32m+[m[32m                result.retrieval_latency_ms,[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            span.set_attribute([m
+[32m+[m[32m                "rag.generation_latency_ms",[m
+[32m+[m[32m                result.generation_latency_ms,[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            if result.total_tokens is not None:[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "llm.total_tokens",[m
+[32m+[m[32m                    result.total_tokens,[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                "final_answer": result.answer,[m
+[32m+[m[32m                "sources": sources,[m
+[32m+[m[32m                "messages": [[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        "role": "assistant",[m
+[32m+[m[32m                        "content": result.answer,[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                ],[m
+[32m+[m[32m                "steps": [[m
+[32m+[m[32m                    *state.get([m
+[32m+[m[32m                        "steps",[m
+[32m+[m[32m                        [],[m
+[32m+[m[32m                    ),[m
+[32m+[m[32m                    "rag",[m
+[32m+[m[32m                ],[m
+[32m+[m[32m            }[m
+ [m
+     def tool_node([m
+         self,[m
+         state: AgentState,[m
+     ) -> dict[str, Any]:[m
+[31m-        try:[m
+[31m-            tools = self.mcp_client.openai_tool_schemas()[m
+[32m+[m[32m        with tracer.start_as_current_span("agent.mcp_tool") as span:[m
+[32m+[m[32m            try:[m
+[32m+[m[32m                tools = self.mcp_client.openai_tool_schemas()[m
+[32m+[m
+[32m+[m[32m                tool_call = self.llm.choose_tool([m
+[32m+[m[32m                    user_prompt=(state["user_message"]),[m
+[32m+[m[32m                    tools=tools,[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                if tool_call is None:[m
+[32m+[m[32m                    span.set_attribute([m
+[32m+[m[32m                        "tool.selected",[m
+[32m+[m[32m                        False,[m
+[32m+[m[32m                    )[m
+[32m+[m
+[32m+[m[32m                    return {[m
+[32m+[m[32m                        "tool_error": "No MCP tool selected.",[m
+[32m+[m[32m                        "steps": [[m
+[32m+[m[32m                            *state.get([m
+[32m+[m[32m                                "steps",[m
+[32m+[m[32m                                [],[m
+[32m+[m[32m                            ),[m
+[32m+[m[32m                            "mcp_tool_selection_failed",[m
+[32m+[m[32m                        ],[m
+[32m+[m[32m                    }[m
+[32m+[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "tool.selected",[m
+[32m+[m[32m                    True,[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "tool.name",[m
+[32m+[m[32m                    tool_call.name,[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                result = self.mcp_client.call_tool([m
+[32m+[m[32m                    name=tool_call.name,[m
+[32m+[m[32m                    arguments=(tool_call.arguments),[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "tool.success",[m
+[32m+[m[32m                    not result.is_error,[m
+[32m+[m[32m                )[m
+ [m
+[31m-            tool_call = self.llm.choose_tool([m
+[31m-                user_prompt=(state["user_message"]),[m
+[31m-                tools=tools,[m
+[31m-            )[m
+[31m-[m
+[31m-            if tool_call is None:[m
+                 return {[m
+[31m-                    "tool_name": None,[m
+[31m-                    "tool_arguments": {},[m
+[31m-                    "tool_result": None,[m
+[31m-                    "tool_error": "No MCP tool selected.",[m
+[32m+[m[32m                    "tool_name": tool_call.name,[m
+[32m+[m[32m                    "tool_arguments": tool_call.arguments,[m
+[32m+[m[32m                    "tool_result": result.data,[m
+[32m+[m[32m                    "tool_error": result.error,[m
+                     "steps": [[m
+                         *state.get([m
+                             "steps",[m
+                             [],[m
+                         ),[m
+[31m-                        ("mcp_tool_selection_failed"),[m
+[32m+[m[32m                        f"mcp_tool:{tool_call.name}",[m
+                     ],[m
+                 }[m
+ [m
+[31m-            result = self.mcp_client.call_tool([m
+[31m-                name=(tool_call.name),[m
+[31m-                arguments=(tool_call.arguments),[m
+[31m-            )[m
+[32m+[m[32m            except Exception as exc:[m
+[32m+[m[32m                # 1. 把异常记录到当前 Span[m
+[32m+[m[32m                span.record_exception(exc)[m
+[32m+[m
+[32m+[m[32m                # 2. 明确告诉 OpenTelemetry：[m
+[32m+[m[32m                #    这个 Span 是失败状态[m
+[32m+[m[32m                span.set_status([m
+[32m+[m[32m                    Status([m
+[32m+[m[32m                        StatusCode.ERROR,[m
+[32m+[m[32m                        str(exc),[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                # 3. 也可以额外记录一些安全的属性[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "tool.success",[m
+[32m+[m[32m                    False,[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m                span.set_attribute([m
+[32m+[m[32m                    "error.type",[m
+[32m+[m[32m                    type(exc).__name__,[m
+[32m+[m[32m                )[m
+ [m
+[31m-            if result.is_error:[m
+                 return {[m
+[31m-                    "tool_name": tool_call.name,[m
+[31m-                    "tool_arguments": tool_call.arguments,[m
+[31m-                    "tool_result": None,[m
+[31m-                    "tool_error": result.error,[m
+[32m+[m[32m                    "tool_error": str(exc),[m
+                     "steps": [[m
+                         *state.get([m
+                             "steps",[m
+                             [],[m
+                         ),[m
+[31m-                        (f"mcp_tool_error:{tool_call.name}"),[m
+[32m+[m[32m                        "mcp_tool_exception",[m
+                     ],[m
+                 }[m
+ [m
+[31m-            return {[m
+[31m-                "tool_name": tool_call.name,[m
+[31m-                "tool_arguments": tool_call.arguments,[m
+[31m-                "tool_result": result.data,[m
+[31m-                "tool_error": None,[m
+[31m-                "steps": [[m
+[31m-                    *state.get([m
+[31m-                        "steps",[m
+[31m-                        [],[m
+[31m-                    ),[m
+[31m-                    (f"mcp_tool:{tool_call.name}"),[m
+[31m-                ],[m
+[31m-            }[m
+[31m-[m
+[31m-        except Exception as exc:[m
+[31m-            return {[m
+[31m-                "tool_error": str(exc),[m
+[31m-                "steps": [[m
+[31m-                    *state.get([m
+[31m-                        "steps",[m
+[31m-                        [],[m
+[31m-                    ),[m
+[31m-                    "mcp_tool_exception",[m
+[31m-                ],[m
+[31m-            }[m
+[31m-[m
+     def tool_answer_node([m
+         self,[m
+         state: AgentState,[m
+[36m@@ -338,44 +425,91 @@[m [mclass AgentNodes:[m
+             "steps": ["prepare_turn"],[m
+         }[m
+ [m
+[32m+[m[32m    # def rewrite_query_node([m
+[32m+[m[32m    #     self,[m
+[32m+[m[32m    #     state: AgentState,[m
+[32m+[m[32m    # ) -> dict[str, Any]:[m
+[32m+[m[32m    #     messages = state.get([m
+[32m+[m[32m    #         "messages",[m
+[32m+[m[32m    #         [],[m
+[32m+[m[32m    #     )[m
+[32m+[m
+[32m+[m[32m    #     recent_history = messages[-6:][m
+[32m+[m
+[32m+[m[32m    #     history_text = "\n".join([m
+[32m+[m[32m    #         f"{message['role']}: {message['content']}" for message in recent_history[m
+[32m+[m[32m    #     )[m
+[32m+[m
+[32m+[m[32m    #     response = self.llm.chat([m
+[32m+[m[32m    #         system_prompt=([m
+[32m+[m[32m    #             "你负责将多轮对话中的当前问题"[m
+[32m+[m[32m    #             "改写成适合知识库检索的独立问题。"[m
+[32m+[m[32m    #             "只做必要的指代消解，"[m
+[32m+[m[32m    #             "不得引入对话中不存在的新医学事实。"[m
+[32m+[m[32m    #             "只返回改写后的问题。"[m
+[32m+[m[32m    #         ),[m
+[32m+[m[32m    #         user_prompt=([m
+[32m+[m[32m    #             f"历史对话：\n{history_text}\n\n当前问题：\n{state['user_message']}"[m
+[32m+[m[32m    #         ),[m
+[32m

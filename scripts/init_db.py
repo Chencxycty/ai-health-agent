@@ -2,6 +2,7 @@ from sqlalchemy import text
 
 from health_agent.database.base import Base
 from health_agent.database.models import DocumentChunkModel  # noqa: F401
+import health_agent.healthcare.models  # noqa: F401
 from health_agent.database.session import engine
 
 
