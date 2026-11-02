@@ -34,6 +34,22 @@ from health_agent.api.schemas import (
     AgentResumeRequest,
 )
 
+from fastapi import FastAPI
+from opentelemetry.instrumentation.fastapi import (
+    FastAPIInstrumentor,
+)
+
+from health_agent.observability.tracing import (
+    setup_tracing,
+)
+
+setup_tracing()
+
+app = FastAPI(title="AI Health Agent")
+
+
+FastAPIInstrumentor.instrument_app(app)
+
 configure_logging()
 logger = logging.getLogger(__name__)
 

@@ -14,6 +14,16 @@ from health_agent.tools.registry import (
 from health_agent.mcp.client import (
     HealthMCPClient,
 )
+from health_agent.observability.tracing import (
+    get_tracer,
+)
+from opentelemetry.trace import (
+    Status,
+    StatusCode,
+)
+
+
+tracer = get_tracer()
 
 
 class AgentNodes:
@@ -33,20 +43,31 @@ class AgentNodes:
         self,
         state: AgentState,
     ) -> dict[str, Any]:
-        assessment = assess_risk(state["user_message"])
+        with tracer.start_as_current_span("agent.risk") as span:
+            assessment = assess_risk(state["user_message"])
 
-        return {
-            "risk_level": assessment.level,
-            "risk_reason": assessment.reason,
-            "review_required": (assessment.level == "high"),
-            "steps": [
-                *state.get(
-                    "steps",
-                    [],
-                ),
-                "risk_check",
-            ],
-        }
+            span.set_attribute(
+                "agent.risk_level",
+                assessment.level,
+            )
+
+            span.set_attribute(
+                "agent.review_required",
+                assessment.level == "high",
+            )
+
+            return {
+                "risk_level": assessment.level,
+                "risk_reason": assessment.reason,
+                "review_required": assessment.level == "high",
+                "steps": [
+                    *state.get(
+                        "steps",
+                        [],
+                    ),
+                    "risk_check",
+                ],
+            }
 
     def human_review_node(
         self,
@@ -101,19 +122,33 @@ class AgentNodes:
         self,
         state: AgentState,
     ) -> dict[str, Any]:
-        result = classify_intent(
-            llm=self.llm,
-            query=state["user_message"],
-        )
+        with tracer.start_as_current_span("agent.router") as span:
+            result = classify_intent(
+                llm=self.llm,
+                query=state["user_message"],
+            )
 
-        return {
-            "route": result.intent,
-            "confidence": result.confidence,
-            "steps": [
-                *state.get("steps", []),
-                "router",
-            ],
-        }
+            span.set_attribute(
+                "agent.route",
+                result.intent,
+            )
+
+            span.set_attribute(
+                "agent.route_confidence",
+                result.confidence,
+            )
+
+            return {
+                "route": result.intent,
+                "confidence": result.confidence,
+                "steps": [
+                    *state.get(
+                        "steps",
+                        [],
+                    ),
+                    "router",
+                ],
+            }
 
     def chat_node(
         self,
@@ -153,109 +188,161 @@ class AgentNodes:
         self,
         state: AgentState,
     ) -> dict[str, Any]:
-        query = state.get("rag_query") or state["user_message"]
+        with tracer.start_as_current_span("agent.rag") as span:
+            query = state.get("rag_query") or state["user_message"]
 
-        result = self.rag_service.answer(
-            query=query,
-        )
+            result = self.rag_service.answer(
+                query=query,
+                top_k=5,
+            )
 
-        sources = [
-            {
-                "source_id": citation.source_id,
-                "title": citation.title,
-                "page": citation.page,
-                "chunk_id": citation.chunk_id,
-            }
-            for citation in result.citations
-        ]
-
-        return {
-            "final_answer": result.answer,
-            "sources": sources,
-            "messages": [
+            sources = [
                 {
-                    "role": "assistant",
-                    "content": result.answer,
+                    "source_id": citation.source_id,
+                    "title": citation.title,
+                    "page": citation.page,
+                    "chunk_id": citation.chunk_id,
                 }
-            ],
-            "steps": [
-                *state.get("steps", []),
-                "rag",
-            ],
-        }
+                for citation in result.citations
+            ]
+
+            span.set_attribute(
+                "rag.source_count",
+                len(sources),
+            )
+
+            span.set_attribute(
+                "rag.retrieval_latency_ms",
+                result.retrieval_latency_ms,
+            )
+
+            span.set_attribute(
+                "rag.generation_latency_ms",
+                result.generation_latency_ms,
+            )
+
+            if result.total_tokens is not None:
+                span.set_attribute(
+                    "llm.total_tokens",
+                    result.total_tokens,
+                )
+
+            return {
+                "final_answer": result.answer,
+                "sources": sources,
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": result.answer,
+                    }
+                ],
+                "steps": [
+                    *state.get(
+                        "steps",
+                        [],
+                    ),
+                    "rag",
+                ],
+            }
 
     def tool_node(
         self,
         state: AgentState,
     ) -> dict[str, Any]:
-        try:
-            tools = self.mcp_client.openai_tool_schemas()
+        with tracer.start_as_current_span("agent.mcp_tool") as span:
+            try:
+                tools = self.mcp_client.openai_tool_schemas()
 
-            tool_call = self.llm.choose_tool(
-                user_prompt=(state["user_message"]),
-                tools=tools,
-            )
+                tool_call = self.llm.choose_tool(
+                    user_prompt=(state["user_message"]),
+                    tools=tools,
+                )
 
-            if tool_call is None:
-                return {
-                    "tool_name": None,
-                    "tool_arguments": {},
-                    "tool_result": None,
-                    "tool_error": "No MCP tool selected.",
-                    "steps": [
-                        *state.get(
-                            "steps",
-                            [],
-                        ),
-                        ("mcp_tool_selection_failed"),
-                    ],
-                }
+                if tool_call is None:
+                    span.set_attribute(
+                        "tool.selected",
+                        False,
+                    )
 
-            result = self.mcp_client.call_tool(
-                name=(tool_call.name),
-                arguments=(tool_call.arguments),
-            )
+                    return {
+                        "tool_error": "No MCP tool selected.",
+                        "steps": [
+                            *state.get(
+                                "steps",
+                                [],
+                            ),
+                            "mcp_tool_selection_failed",
+                        ],
+                    }
 
-            if result.is_error:
+                span.set_attribute(
+                    "tool.selected",
+                    True,
+                )
+
+                span.set_attribute(
+                    "tool.name",
+                    tool_call.name,
+                )
+
+                result = self.mcp_client.call_tool(
+                    name=tool_call.name,
+                    arguments=(tool_call.arguments),
+                )
+
+                span.set_attribute(
+                    "tool.success",
+                    not result.is_error,
+                )
+
                 return {
                     "tool_name": tool_call.name,
                     "tool_arguments": tool_call.arguments,
-                    "tool_result": None,
+                    "tool_result": result.data,
                     "tool_error": result.error,
                     "steps": [
                         *state.get(
                             "steps",
                             [],
                         ),
-                        (f"mcp_tool_error:{tool_call.name}"),
+                        f"mcp_tool:{tool_call.name}",
                     ],
                 }
 
-            return {
-                "tool_name": tool_call.name,
-                "tool_arguments": tool_call.arguments,
-                "tool_result": result.data,
-                "tool_error": None,
-                "steps": [
-                    *state.get(
-                        "steps",
-                        [],
-                    ),
-                    (f"mcp_tool:{tool_call.name}"),
-                ],
-            }
+            except Exception as exc:
+                # 1. 把异常记录到当前 Span
+                span.record_exception(exc)
 
-        except Exception as exc:
-            return {
-                "tool_error": str(exc),
-                "steps": [
-                    *state.get(
-                        "steps",
-                        [],
-                    ),
-                    "mcp_tool_exception",
-                ],
-            }
+                # 2. 明确告诉 OpenTelemetry：
+                #    这个 Span 是失败状态
+                span.set_status(
+                    Status(
+                        StatusCode.ERROR,
+                        str(exc),
+                    )
+                )
+
+                # 3. 也可以额外记录一些安全的属性
+                span.set_attribute(
+                    "tool.success",
+                    False,
+                )
+
+                span.set_attribute(
+                    "error.type",
+                    type(exc).__name__,
+                )
+
+                return {
+                    "tool_error": str(exc),
+                    "steps": [
+                        *state.get(
+                            "steps",
+                            [],
+                        ),
+                        "mcp_tool_exception",
+                    ],
+                }
 
     def tool_answer_node(
         self,
@@ -338,44 +425,91 @@ class AgentNodes:
             "steps": ["prepare_turn"],
         }
 
+    # def rewrite_query_node(
+    #     self,
+    #     state: AgentState,
+    # ) -> dict[str, Any]:
+    #     messages = state.get(
+    #         "messages",
+    #         [],
+    #     )
+
+    #     recent_history = messages[-6:]
+
+    #     history_text = "\n".join(
+    #         f"{message['role']}: {message['content']}" for message in recent_history
+    #     )
+
+    #     response = self.llm.chat(
+    #         system_prompt=(
+    #             "你负责将多轮对话中的当前问题"
+    #             "改写成适合知识库检索的独立问题。"
+    #             "只做必要的指代消解，"
+    #             "不得引入对话中不存在的新医学事实。"
+    #             "只返回改写后的问题。"
+    #         ),
+    #         user_prompt=(
+    #             f"历史对话：\n{history_text}\n\n当前问题：\n{state['user_message']}"
+    #         ),
+    #         temperature=0.0,
+    #     )
+
+    #     rewritten = response.content.strip()
+
+    #     return {
+    #         "rag_query": rewritten,
+    #         "steps": [
+    #             *state.get(
+    #                 "steps",
+    #                 [],
+    #             ),
+    #             "rewrite_query",
+    #         ],
+    #     }
     def rewrite_query_node(
         self,
         state: AgentState,
     ) -> dict[str, Any]:
-        messages = state.get(
-            "messages",
-            [],
-        )
+        with tracer.start_as_current_span("agent.query_rewrite") as span:
+            messages = state.get(
+                "messages",
+                [],
+            )
 
-        recent_history = messages[-6:]
+            recent_history = messages[-6:]
 
-        history_text = "\n".join(
-            f"{message['role']}: {message['content']}" for message in recent_history
-        )
+            history_text = "\n".join(
+                f"{message['role']}: {message['content']}" for message in recent_history
+            )
 
-        response = self.llm.chat(
-            system_prompt=(
-                "你负责将多轮对话中的当前问题"
-                "改写成适合知识库检索的独立问题。"
-                "只做必要的指代消解，"
-                "不得引入对话中不存在的新医学事实。"
-                "只返回改写后的问题。"
-            ),
-            user_prompt=(
-                f"历史对话：\n{history_text}\n\n当前问题：\n{state['user_message']}"
-            ),
-            temperature=0.0,
-        )
-
-        rewritten = response.content.strip()
-
-        return {
-            "rag_query": rewritten,
-            "steps": [
-                *state.get(
-                    "steps",
-                    [],
+            response = self.llm.chat(
+                system_prompt=(
+                    "你负责将多轮对话中的当前问题"
+                    "改写成适合知识库检索的独立问题。"
+                    "只做必要的指代消解，"
+                    "不得引入对话中不存在的新医学事实。"
+                    "只返回改写后的问题。"
                 ),
-                "rewrite_query",
-            ],
-        }
+                user_prompt=(
+                    f"历史对话：\n{history_text}\n\n当前问题：\n{state['user_message']}"
+                ),
+                temperature=0.0,
+            )
+
+            rewritten = response.content.strip()
+
+            span.set_attribute(
+                "rewrite.performed",
+                True,
+            )
+
+            return {
+                "rag_query": rewritten,
+                "steps": [
+                    *state.get(
+                        "steps",
+                        [],
+                    ),
+                    "rewrite_query",
+                ],
+            }

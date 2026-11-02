@@ -12,6 +12,10 @@ from pydantic import BaseModel
 from health_agent.tools.registry import (
     execute_tool,
 )
+from health_agent.observability.tracing import (
+    get_tracer,
+    setup_tracing,
+)
 
 
 mcp = MCPServer(
@@ -66,6 +70,9 @@ def _to_jsonable(
     return str(value)
 
 
+tracer = get_tracer()
+
+
 @mcp.tool()
 def calculate_bmi(
     height_cm: float,
@@ -79,6 +86,12 @@ def calculate_bmi(
     This tool only performs deterministic
     calculation and does not diagnose disease.
     """
+    with tracer.start_as_current_span("mcp.calculate_bmi") as span:
+        span.set_attribute(
+            "tool.name",
+            "calculate_bmi",
+        )
+
     result = execute_tool(
         name="calculate_bmi",
         arguments={
@@ -170,6 +183,7 @@ def health_capabilities() -> str:
 
 
 def main() -> None:
+    setup_tracing()
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -209,6 +223,27 @@ def main() -> None:
         # 简化HTTP响应
         json_response=True,
     )
+
+
+from health_agent.healthcare.service import (
+    PatientDataService,
+)
+
+patient_service = PatientDataService()
+
+
+@mcp.tool()
+def get_patient_summary(
+    patient_id: str,
+) -> dict:
+    """
+    Get synthetic or deidentified
+    patient health data.
+
+    Only use this tool when the caller
+    is authorized to access the patient.
+    """
+    return patient_service.get_patient_summary(patient_id)
 
 
 if __name__ == "__main__":
