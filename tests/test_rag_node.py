@@ -18,6 +18,9 @@ class FakeCitation:
 class FakeRAGAnswer:
     answer: str
     citations: list[FakeCitation]
+    retrieval_latency_ms: float = 0.0
+    generation_latency_ms: float = 0.0
+    total_tokens: int | None = None
 
 
 class FakeRAGService:
