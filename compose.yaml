@@ -1,28 +1,110 @@
+
 services:
+
   postgres:
     image: pgvector/pgvector:pg17
     container_name: health-agent-postgres
+    restart: unless-stopped
 
     environment:
       POSTGRES_USER: health
-      POSTGRES_PASSWORD: health
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-health}
       POSTGRES_DB: health_agent
 
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U health -d health_agent"
-        ]
+        - CMD-SHELL
+        - pg_isready -U health -d health_agent
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+
+
+  mcp-health:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: ai-health-agent:0.3.0
+    container_name: health-agent-mcp
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    command:
+      - python
+      - -m
+      - health_agent.mcp.server
+      - --transport
+      - streamable-http
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8100"
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://health:${POSTGRES_PASSWORD:-health}@postgres:5432/health_agent
+      OTEL_SERVICE_NAME: health-agent-mcp
+
+    ports:
+      - "127.0.0.1:8100:8100"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: ai-health-agent:0.3.0
+    container_name: health-agent-api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://health:${POSTGRES_PASSWORD:-health}@postgres:5432/health_agent
+      MCP_HEALTH_SERVER_URL: http://mcp-health:8100/mcp
+      HF_HOME: /home/appuser/.cache/huggingface
+      OTEL_SERVICE_NAME: health-agent-api
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    volumes:
+      - ./data:/app/data
+      - huggingface_cache:/home/appuser/.cache/huggingface
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-health:
+        condition: service_started
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
 
 volumes:
   postgres_data:
+  huggingface_cache:

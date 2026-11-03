@@ -1,3 +1,4 @@
+import os
 import sys
 from functools import lru_cache
 
@@ -24,7 +25,10 @@ def setup_tracing() -> None:
 
     resource = Resource.create(
         {
-            "service.name": "ai-health-agent",
+            "service.name": os.getenv(
+                "OTEL_SERVICE_NAME",
+                "ai-health-agent",
+            ),
             "service.version": "0.3.0",
         }
     )

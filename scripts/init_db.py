@@ -12,7 +12,7 @@ def main() -> None:
 
     Base.metadata.create_all(bind=engine)
 
-    print("Database initialized.")
+    print("Database initialized successfully.")
 
 
 if __name__ == "__main__":
