@@ -1,4 +1,4 @@
-# AI Health Agent
+# AI Health Agent（学习用，非完整Agent项目）
 
 > v0.3.0 · 基于 FastAPI、LangGraph、RAG、MCP 与 PostgreSQL/pgvector 的健康信息智能体后端。
 
