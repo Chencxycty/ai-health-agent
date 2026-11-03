@@ -30,6 +30,8 @@ RUN python -m pip install --no-cache-dir \
 # 复制应用代码
 COPY --chown=appuser:appuser src /app/src
 COPY --chown=appuser:appuser scripts /app/scripts
+COPY --chown=appuser:appuser alembic /app/alembic
+COPY --chown=appuser:appuser alembic.ini /app/alembic.ini
 
 # 创建数据目录
 RUN mkdir -p /app/data \

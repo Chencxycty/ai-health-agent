@@ -1,18 +1,17 @@
-from sqlalchemy import text
+from pathlib import Path
 
-from health_agent.database.base import Base
-from health_agent.database.models import DocumentChunkModel  # noqa: F401
-import health_agent.healthcare.models  # noqa: F401
-from health_agent.database.session import engine
+from alembic.config import Config
+
+from alembic import command
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    with engine.begin() as connection:
-        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    command.upgrade(config, "head")
 
-    Base.metadata.create_all(bind=engine)
-
-    print("Database initialized successfully.")
+    print("Database migrated to the latest business schema.")
 
 
 if __name__ == "__main__":

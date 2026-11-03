@@ -9,9 +9,7 @@ from health_agent.observability.tracing import (
 def test_setup_tracing() -> None:
     setup_tracing()
 
-    provider = (
-        trace.get_tracer_provider()
-    )
+    provider = trace.get_tracer_provider()
 
     assert provider is not None
 
@@ -20,9 +18,7 @@ def test_setup_tracing_twice() -> None:
     setup_tracing()
     setup_tracing()
 
-    provider = (
-        trace.get_tracer_provider()
-    )
+    provider = trace.get_tracer_provider()
 
     assert provider is not None
 
@@ -40,9 +36,7 @@ def test_create_span() -> None:
 
     tracer = get_tracer()
 
-    with tracer.start_as_current_span(
-        "test.span"
-    ) as span:
+    with tracer.start_as_current_span("test.span") as span:
         span.set_attribute(
             "test.value",
             123,
@@ -51,6 +45,7 @@ def test_create_span() -> None:
         assert span is not None
 
         assert span.is_recording()
+
 
 from opentelemetry.trace import (
     Status,
@@ -63,18 +58,12 @@ def test_record_exception() -> None:
 
     tracer = get_tracer()
 
-    with tracer.start_as_current_span(
-        "test.error"
-    ) as span:
+    with tracer.start_as_current_span("test.error") as span:
         try:
-            raise ValueError(
-                "test error"
-            )
+            raise ValueError("test error")
 
         except ValueError as exc:
-            span.record_exception(
-                exc
-            )
+            span.record_exception(exc)
 
             span.set_status(
                 Status(
@@ -83,7 +72,4 @@ def test_record_exception() -> None:
                 )
             )
 
-            assert (
-                span.status.status_code
-                == StatusCode.ERROR
-            )
+            assert span.status.status_code == StatusCode.ERROR

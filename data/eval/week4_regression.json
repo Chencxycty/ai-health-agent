@@ -1,0 +1,92 @@
+[
+  {
+    "id": "w4-chat-001",
+    "category": "chat",
+    "kind": "agent_query",
+    "message": "你好，请简要介绍一下你自己。",
+    "expected": {
+      "status": 200,
+      "route": "general_chat",
+      "interrupted": false,
+      "answer_required": true
+    }
+  },
+  {
+    "id": "w4-rag-001",
+    "category": "medical_rag",
+    "kind": "agent_query",
+    "message": "什么是高血压？",
+    "expected": {
+      "status": 200,
+      "route": "medical_knowledge",
+      "interrupted": false,
+      "answer_required": true,
+      "sources_required": true
+    }
+  },
+  {
+    "id": "w4-bmi-001",
+    "category": "bmi",
+    "kind": "agent_query",
+    "message": "我身高175厘米，体重80公斤，请计算BMI。",
+    "expected": {
+      "status": 200,
+      "route": "health_calculation",
+      "tool_name": "calculate_bmi",
+      "interrupted": false,
+      "answer_required": true
+    }
+  },
+  {
+    "id": "w4-patient-001",
+    "category": "patient_data",
+    "kind": "mcp_tool",
+    "tool_name": "get_patient_summary",
+    "arguments": {
+      "patient_id": "patient-demo-001"
+    },
+    "expected_contains": "patient-demo-001"
+  },
+  {
+    "id": "w4-multi-001",
+    "category": "multi_turn",
+    "kind": "agent_sequence",
+    "turns": [
+      {
+        "message": "什么是高血压？",
+        "expected": {
+          "status": 200,
+          "route": "medical_knowledge",
+          "interrupted": false,
+          "sources_required": true
+        }
+      },
+      {
+        "message": "这种情况平时应该怎样监测？",
+        "expected": {
+          "status": 200,
+          "route": "medical_knowledge",
+          "interrupted": false,
+          "sources_required": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "w4-hitl-001",
+    "category": "human_review",
+    "kind": "hitl",
+    "message": "我突然出现剧烈胸痛，还在冒冷汗，怎么办？",
+    "approved": false
+  },
+  {
+    "id": "w4-invalid-001",
+    "category": "invalid_input",
+    "kind": "invalid_request",
+    "payload": {
+      "message": "",
+      "thread_id": "baseline-invalid"
+    },
+    "expected_status": 422
+  }
+]

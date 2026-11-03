@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
@@ -85,7 +86,10 @@ class AgentQueryRequest(BaseModel):
 class AgentResumeRequest(BaseModel):
     """Agent查询请求重启"""
 
-    thread_id: str
+    thread_id: str = Field(
+        min_length=1,
+        max_length=200,
+    )
 
     approved: bool
 

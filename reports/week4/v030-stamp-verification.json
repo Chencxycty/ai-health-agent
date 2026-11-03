@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-11-03T17:25:56.422860+08:00",
+  "database": "postgresql+psycopg://127.0.0.1:55432/health_agent_v030",
+  "target_revision": "20261103_0001",
+  "vector_extension_installed": true,
+  "schema_matches": true,
+  "differences": [],
+  "row_counts": {
+    "conditions": 1,
+    "document_chunks": 0,
+    "observations": 6,
+    "patients": 1
+  },
+  "stamped": true,
+  "row_counts_after_stamp": {
+    "conditions": 1,
+    "document_chunks": 0,
+    "observations": 6,
+    "patients": 1
+  },
+  "data_preserved": true
+}
